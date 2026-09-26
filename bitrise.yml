@@ -17,16 +17,25 @@ workflows:
       # Install Node.js dependencies
       - npm-install@3: {}
       
+      # Build Frontend (generate dist/ for Capacitor)
+      - npm-run-script@1:
+          inputs:
+            scriptName: build
+            workingDirectory: .
+      
       # Set up JDK 17
-      - java-toolchain-setup@3: {}
+      - java-toolchain-setup@3:
+          inputs:
+            jdk-version: 17
       
       # Get Android SDK license
       - android-sdk-license-validator@4: {}
       
       # Run Gradle debug build
-      - gradle-runner@6:
+      - gradle-runner@10:
           inputs:
-            - command: assembleDebug
+            taskDefinition:
+              command: assembleDebug
               path: ./android/app/build.gradle
       
       # Test and verify
@@ -36,10 +45,13 @@ workflows:
               path: ./android/app/build.gradle
       
       # Upload APK to artifact storage
-      - upload-artifact@1:
-          settings:
-            artifact-path: "./android/app/build/outputs/apk/debug/*.apk"
-            public: true
+      - apk-info-reader@1:
+          inputs:
+            apk-path: "./android/app/build/outputs/apk/debug/app-debug.apk"
+      
+      - deploy-to-bitrise-io@2:
+          inputs:
+            deployment-target: development
     
     # Workflow environment variables
     environment:
