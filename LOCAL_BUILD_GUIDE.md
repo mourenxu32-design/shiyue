@@ -1,367 +1,387 @@
-# 📱 ShiYue Android - 纯本地 Gradle 构建指南 (无需 Docker)
+# 🏗️ ShiYue Android - 本地构建完整指南
 
-## 🎯 为什么选择本地构建？
+## 📋 概览
 
-- ✅ **离线可用** - 不需要互联网连接
-- ✅ **完全控制** - 自己掌控构建环境
-- ✅ **速度更快** - 第二次构建只需 1-2 分钟
-- ✅ **无需注册** - 不需要第三方服务账号
-- ✅ **数据隐私** - APK 构建结果完全在本地
+本指南提供两种本地 APK 构建方案：
+1. **一键脚本构建**（推荐）- `build-apk.ps1`
+2. **手动构建** - 逐步指导
 
 ---
 
-## 📦 前提条件
+## 🚀 方案 A: 一键脚本构建（最简单）
 
-### 必需软件：
+### ✅ 系统要求
 
-| 软件 | 版本要求 | 下载地址 |
-|------|---------|---------|
-| **JDK 17** | LTS 版本 | https://adoptium.net/ |
-| **Android Studio** | 最新版 | https://developer.android.com/studio |
-| **Gradle** | 8.14+ | 已集成在 Android Studio 中 |
+| 软件 | 版本要求 | 下载地址 | 说明 |
+|------|---------|---------|------|
+| **Node.js** | v16+ | https://nodejs.org/ | 用于安装前端依赖 |
+| **JDK 17** | LTS | https://adoptium.net/ | Java 编译环境 |
+| **Android SDK** | API 34+ | https://developer.android.com/studio | 通过 Android Studio 安装 |
+| **PowerShell** | v5.1+ | Windows 默认自带 | 运行构建脚本 |
 
 ---
 
-## 🔧 步骤 1: 安装 JDK 17
+### 🔧 第一步：安装依赖
 
-### Windows 用户:
+#### 1. 安装 Node.js
 
 ```powershell
-# 下载并安装 Temurin JDK 17
-# https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.9%2B9/OpenJDK17U-jdk_x64_windows_hotspot_17.0.9_9.msi
+# 方式 1: Winget (Windows 11+)
+winget install OpenJS.NodeJS.LTS
 
-# 安装后验证
-java -version
-javac -version
+# 方式 2: 手动安装
+# 访问 https://nodejs.org/ 下载 LTS 版本安装
 ```
 
-### 设置环境变量:
-
-**方法 A: PowerShell (临时)**
+验证安装：
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17"
+node --version  # 应该输出 v18.x.x 或更高
+npm --version   # 应该输出 9.x.x 或更高
+```
+
+#### 2. 安装 JDK 17
+
+```powershell
+# 方式 1: Winget
+winget install EclipseAdoptium.Temurin.17.JDK
+
+# 方式 2: 手动安装
+# 访问 https://adoptium.net/ 下载 Windows x64 installer
+```
+
+验证安装并设置环境变量：
+```powershell
+java -version  # 应该输出 openjdk version "17.x.x"
+
+# 设置 JAVA_HOME（在 PowerShell 中添加）
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.bin"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
+
+# 永久设置（管理员 PowerShell）
+[System.Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Eclipse Adoptium\jdk-17.bin", "Machine")
 ```
 
-**方法 B: 系统属性 (永久)**
-1. 右键 "此电脑" → "属性" → "高级系统设置"
-2. "环境变量" → "新建"
-3. 变量名：`JAVA_HOME`
-4. 变量值：`C:\Program Files\Eclipse Adoptium\jdk-17`
-5. 编辑 Path，添加：`%JAVA_HOME%\bin`
+#### 3. 安装 Android SDK
+
+**推荐方式：使用 Android Studio**
+
+1. 下载 Android Studio: https://developer.android.com/studio
+2. 安装时勾选 "Android SDK"
+3. 打开 SDK Manager，安装以下组件：
+   - Android SDK Platform 34
+   - Android SDK Build-Tools 34.0.0
+   - Android Emulator (可选)
+   - Intel x86 Atom Debugger (可选)
+
+设置环境变量：
+```powershell
+# 添加至系统环境变量
+ANDROID_HOME = C:\Users\Administrator\AppData\Local\Android\Sdk
+PATH = %ANDROID_HOME%\tools; %ANDROID_HOME%\platform-tools
+```
+
+验证：
+```powershell
+adb version  # 应该显示 Android Debug Bridge 版本
+```
 
 ---
 
-## 🔧 步骤 2: 安装 Android Studio
+### ⚡ 第二步：运行构建脚本
 
-### 下载 & 安装:
-1. 访问 https://developer.android.com/studio
-2. 下载 **Standalone Installer** (非 Bundle)
-3. 安装时勾选 **Android SDK**
-
-### 配置 SDK:
-打开 Android Studio:
-1. Tools → SDK Manager
-2. SDK Platforms → 勾选 "Android API 34"
-3. SDK Tools → 勾选 "Android SDK Build-tools 34.0.0"
-4. Apply → OK
-
----
-
-## 🔧 步骤 3: 配置环境变量
-
-### Windows 环境变量设置:
+#### 基本用法
 
 ```powershell
-# 添加到您的 PATH
-$androidSdk = "C:\Users\Administrator\AppData\Local\Android\Sdk"
-$gradleHome = "C:\Users\Administrator\.gradle\net"
-
-[System.Environment]::SetEnvironmentVariable("ANDROID_HOME", $androidSdk, "User")
-[System.Environment]::SetEnvironmentVariable("PATH", "$androidSdk\platform-tools;$androidSdk\emulator;" + [System.Environment]::GetEnvironmentVariable("PATH","User"), "User")
+cd C:\Users\Administrator\Desktop\计划\shiyue_app
+.\build-apk.ps1
 ```
 
-### 或者手动编辑:
+#### 常用选项
 
-**系统变量 → 新建:**
-- `ANDROID_HOME` = `C:\Users\Administrator\AppData\Local\Android\Sdk`
-- `ANDROID_SDK_ROOT` = `C:\Users\Administrator\AppData\Local\Android\Sdk`
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| `-Clean` | 清理旧构建后再构建 | `.\build-apk.ps1 -Clean` |
+| `-FrontendOnly` | 仅构建前端（不生成 APK） | `.\build-apk.ps1 -FrontendOnly` |
+| `-AndroidOnly` | 仅构建 Android APK | `.\build-apk.ps1 -AndroidOnly` |
+| `-Help` | 显示帮助信息 | `.\build-apk.ps1 -Help` |
 
-**编辑 Path → 添加:**
-- `%ANDROID_HOME%\platform-tools`
-- `%ANDROID_HOME%\tools`
-- `%ANDROID_HOME%\build-tools\34.0.0`
+#### 完整工作流程
 
----
-
-## 🔧 步骤 4: 接受 Android SDK 许可证
-
-命令行执行:
-
-```bash
-cd %ANDROID_HOME%\licenses
-echo y | sdkmanager --licenses
-```
-
-或者使用 gradle 命令自动接受:
-
-```bash
-cd shiyue_app\android
-./gradlew -Dfile.encoding=UTF-8 assembleDebug
-```
-
----
-
-## 🚀 步骤 5: 开始构建！
-
-### 方法 A: 使用 Gradle Wrapper (推荐)
-
-**Windows PowerShell:**
 ```powershell
-cd C:\Users\Administrator\Desktop\计划\shiyue_app\android
+# 首次构建（完整流程）
+.\build-apk.ps1
+# 步骤：
+# ① 检查 Node.js 环境
+# ② npm install (安装前端依赖)
+# ③ npm run build (生成 dist/)
+# ④ gradlew assembleDebug (打包 APK)
+# ⑤ 自动复制 APK 到 ..\..\android\
+
+# 增量构建（后续快速构建）
+.\build-apk.ps1 -AndroidOnly
+# 跳过前端构建，直接打包 APK
+
+# 干净构建
+.\build-apk.ps1 -Clean
+# 先清理所有临时文件，再完整构建
+```
+
+---
+
+### 📦 第三步：获取 APK
+
+构建成功后，APK 会自动保存到：
+
+```
+C:\Users\Administrator\Desktop\计划\android\
+├── shiyue_app-debug_v20260620_143025.apk  (带时间戳的版本)
+└── ... (其他历史版本)
+```
+
+**注意**: 
+- 每次构建会生成带时间戳的副本
+- APK 文件名格式：`{app_name}_debug_v{YYYYMMDD_HHMMSS}.apk`
+- 文件夹会自动打开
+
+---
+
+### ⏱️ 预计构建时间
+
+| 场景 | 首次构建 | 增量构建 |
+|------|---------|---------|
+| **前端依赖安装** | 2-5 分钟 | 0 分钟 |
+| **前端编译** | 1-2 分钟 | 0.5-1 分钟 |
+| **Gradle 初始化** | 1-2 分钟 | 0 分钟 |
+| **APK 打包** | 2-3 分钟 | 1-2 分钟 |
+| **总计** | **6-12 分钟** | **1.5-3 分钟** |
+
+---
+
+## 🔧 方案 B: 手动构建（分步执行）
+
+如果您想手动控制每个步骤，可以按以下顺序执行：
+
+### Step 1: 安装 Node 依赖
+
+```powershell
+cd C:\Users\Administrator\Desktop\计划\shiyue_app
+npm install
+```
+
+### Step 2: 构建前端 Web 应用
+
+```powershell
+npm run build
+```
+
+这会生成 `dist/` 目录，包含编译后的静态资源。
+
+### Step 3: 进入 Android 目录
+
+```powershell
+cd android
+```
+
+### Step 4: 清理旧构建（可选）
+
+```powershell
+.\gradlew.bat clean
+```
+
+### Step 5: 构建 Debug APK
+
+```powershell
 .\gradlew.bat assembleDebug
 ```
 
-**或者直接使用 Gradle:**
-```powershell
-gradle clean assembleDebug
-```
+这会：
+- 编译 Java/Kotlin 代码
+- 合并资源文件
+- 打包成 APK
+- 输出到 `app/build/outputs/apk/debug/`
 
-### 方法 B: 使用 Android Studio
-
-1. 打开 `shiyue_app/android` 文件夹
-2. File → Open → 选择 android 目录
-3. 等待 Gradle 同步完成
-4. Build → Build Bundle(s) / APK(s) → Build APK(s)
-5. 等待构建完成 ✓
-
-### 方法 C: 一键构建脚本
-
-创建 `build-apk.ps1`:
+### Step 6: 复制 APK
 
 ```powershell
-cd "C:\Users\Administrator\Desktop\计划\shiyue_app\android"
-
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "   ShiYue - Local Gradle Build" -ForegroundColor Cyan
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host ""
-
-Write-Host "Step 1: Cleaning..." -ForegroundColor Yellow
-gradlew.bat clean
-
-Write-Host "Step 2: Building APK..." -ForegroundColor Yellow
-gradlew.bat assembleDebug
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host ""
-    Write-Host "=========================================" -ForegroundColor Green
-    Write-Host "            ✅ BUILD SUCCESS!" -ForegroundColor Green
-    Write-Host "=========================================" -ForegroundColor Green
-    
-    # 查找最新 APK
-    $apkFiles = Get-ChildItem "app\build\outputs\apk\debug\*.apk"
-    foreach ($apk in $apkFiles) {
-        Write-Host ""
-        Write-Host "📦 APK found:" -ForegroundColor Cyan
-        Write-Host "  $($apk.FullName)" -ForegroundColor White
-        
-        # 复制到输出目录
-        Copy-Item $apk.FullName "..\..\android\" -Force
-    }
-    
-    # 打开资源管理器
-    Start-Process explorer.exe -ArgumentList "/select," + (Get-ChildItem "..\..\android\*.apk" | Select-Object -First 1).FullName
-} else {
-    Write-Host "Build failed!" -ForegroundColor Red
-}
+cd app\build\outputs\apk\debug
+copy *.apk ..\..\..\..\android\
 ```
 
 ---
 
-## ⏱️ 构建时间参考
+## 🐛 常见问题排查
 
-| 阶段 | 时间 | 说明 |
-|------|------|------|
-| 首次构建 | 2-5 分钟 | 下载 Gradle 依赖 |
-| 二次构建 | 1-2 分钟 | 增量编译，非常快 |
-| Clean build | 3-4 分钟 | 清理缓存后的完整构建 |
+### 问题 1: `npm install` 失败
 
----
+**症状**: 错误提示依赖安装失败
 
-## 🔍 常见问题排查
-
-### 问题 1: "Java compilation initialization error: 无效源代码版本：21"
-
-**原因**: AGP 版本与 JDK 不兼容
-
-**解决**: 
-1. 确保 JDK 是 17 版本
-2. 检查 `android/app/build.gradle` 中的 Java version
-3. AGP 应该使用 8.6.1 版本
-
-### 问题 2: "Could not resolve all files for configuration '...'"
-
-**原因**: Maven 仓库网络连接慢或超时
-
-**解决**:
-修改 `shiyue_app/android/build.gradle`:
-
-```groovy
-repositories {
-    google()
-    maven { url 'https://maven.aliyun.com/repository/public' }
-    maven { url 'https://maven.aliyun.com/repository/central' }
-    maven { url 'https://repo.huaweicloud.com/repository/maven/' }
-    jcenter()
-    mavenCentral()
-}
-```
-
-### 问题 3: "sdkmanager: command not found"
-
-**原因**: Android SDK 路径未配置
-
-**解决**:
+**解决方案**:
 ```powershell
-# 验证 ANDROID_HOME
-$env:ANDROID_HOME
-# 如果没有值，设置它
-[System.Environment]::SetEnvironmentVariable("ANDROID_HOME", "C:\Users\Administrator\AppData\Local\Android\Sdk", "User")
+# 清除 npm 缓存
+npm cache clean --force
+
+# 删除 node_modules 重新安装
+Remove-Item -Recurse -Force node_modules
+npm install
 ```
 
-### 问题 4: Gradle 下载很慢
+### 问题 2: `java -version` 无反应
 
-**优化方法**:
-编辑 `gradle-wrapper.properties`:
+**症状**: PowerShell 找不到 java 命令
 
-```properties
-distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.14-all.zip
-```
-
-或者配置代理:
-
-编辑 `gradle.properties` 添加:
-```properties
-systemProp.http.proxyHost=your-proxy-server
-systemProp.http.proxyPort=8080
-systemProp.https.proxyHost=your-proxy-server
-systemProp.https.proxyPort=8080
-```
-
----
-
-## 💾 构建产物位置
-
-成功构建后，APK 文件位于：
-
-```
-shiyue_app\android\app\build\outputs\apk\debug\app-debug.apk
-```
-
-建议复制到统一目录便于管理:
-
+**解决方案**:
 ```powershell
-Copy-Item "android\app\build\outputs\apk\debug\*.apk" "C:\Users\Administrator\Desktop\计划\android\" -Force
+# 检查 JDK 是否已安装
+cd "C:\Program Files"
+dir jdk* -Depth 0
+
+# 如果找到，设置 JAVA_HOME
+$env:JAVA_HOME = "C:\Program Files\jdk-17"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+
+# 测试
+java -version
 ```
 
----
+### 问题 3: Gradle 构建失败
 
-## 🔧 高级配置优化
+**症状**: `BUILD FAILED` 或 `Could not resolve dependencies`
 
-### 1. 增加 Gradle 内存分配
+**解决方案**:
 
-编辑 `gradle.properties`:
-```properties
-org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
-org.gradle.parallel=true
-org.gradle.caching=true
-org.gradle.daemon=true
-```
+1. **检查网络** (Gradle 需要从互联网下载依赖):
+   ```powershell
+   # 使用国内镜像加速（已在项目中配置）
+   # 见 android/gradle/wrapper/gradle-wrapper.properties
+   ```
 
-### 2. 启用配置缓存 (加速构建)
+2. **清理 Gradle 缓存**:
+   ```powershell
+   cd android
+   Remove-Item -Recurse -Force .gradle
+   Remove-Item -Recurse -Force app\.gradle
+   .\gradlew.bat clean
+   .\gradlew.bat assembleDebug
+   ```
 
-```properties
-org.gradle.configuration-cache=true
-```
+3. **检查 SDK 路径**:
+   ```powershell
+   # 创建或更新 local.properties
+   echo "sdk.dir=C:\\Users\\Administrator\\AppData\\Local\\Android\\Sdk" > android\local.properties
+   ```
 
-### 3. 禁用 R8 混淆 (调试版本)
+### 问题 4: APK 构建成功但体积异常大
 
-编辑 `android/app/build.gradle`:
-```groovy
+**可能原因**:
+- 未启用 ProGuard 混淆
+- 包含了不必要的资源文件
+
+**解决方案**:
+```gradle
+// 编辑 android/app/build.gradle
 buildTypes {
     release {
-        minifyEnabled false // 保持为 false 用于调试
+        minifyEnabled true      // 启用代码压缩
+        shrinkResources true    // 压缩资源
         proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
 }
 ```
 
-### 4. 自定义签名配置 (生产环境)
-
-创建 `android/app/release.keystore`,然后:
-
-```groovy
-android {
-    signingConfigs {
-        release {
-            storeFile file('release.keystore')
-            storePassword 'your-store-password'
-            keyAlias 'your-key-alias'
-            keyPassword 'your-key-password'
-        }
-    }
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-        }
-    }
-}
+然后重新构建：
+```powershell
+.\gradlew.bat assembleRelease
 ```
 
 ---
 
-## 📊 监控构建进度
+## 🆚 本地构建 vs CI/CD 对比
 
-### 查看详细日志:
+| 特性 | 本地构建 | Bitrise CI/CD |
+|------|---------|--------------|
+| **首次设置** | 需要安装所有工具 | 只需推送代码 |
+| **构建时间** | 6-12 分钟 | 8-15 分钟 |
+| **网络要求** | 需要（下载依赖） | 需要 |
+| **成本** | 免费 | 每月 200 分钟免费 |
+| **自动化** | 手动触发 | 自动推送构建 |
+| **调试便利性** | ✅ 立即可见日志 | 需查看在线日志 |
+| **环境一致性** | ⚠️ 依赖本地配置 | ✅ 固定环境 |
+| **适合场景** | 开发阶段频繁构建 | 生产版本发布 |
 
-```bash
-gradlew assembleDebug --info > build.log 2>&1
-```
+---
 
-### 实时监控控制台输出:
+## 🎯 最佳实践建议
+
+### 日常开发
+
+1. **频繁小改动**: 使用增量构建
+   ```powershell
+   .\build-apk.ps1 -AndroidOnly
+   ```
+
+2. **修改 UI/逻辑**: 完整构建一次确保无问题
+   ```powershell
+   .\build-apk.ps1
+   ```
+
+3. ** nightly builds**: 每天凌晨自动构建
+   ```powershell
+   # 创建定时任务（PowerShell）
+   $trigger = New-ScheduledTaskTrigger -Daily -At 2am
+   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File ""C:\path\to\build-apk.ps1"" -Clean"
+   $task = New-ScheduledTask -Trigger $trigger -Action $action
+   Register-ScheduledTask -Name "ShiYueNightlyBuild" -Task $task
+   ```
+
+### 准备 Release 版本
 
 ```powershell
-cd android
-gradlew.bat assembleDebug -s
+# 1. 更新版本号
+cd android/app
+notepad build.gradle  # 修改 versionCode 和 versionName
+
+# 2. 生成 Release APK
+.\gradlew.bat assembleRelease
+
+# 3. 签名配置（需要 keystore 文件）
+# 见 LOCAL_BUILD_GUIDE.md 的"Release 构建"部分
 ```
 
 ---
 
-## 🆘 技术支持
+## 📞 获取更多帮助
 
-### 文档资源:
-- [Android 官方构建指南](https://developer.android.com/studio/build)
-- [Gradle 中文文档](https://docs.gradle.cn/)
-- [Capacitor 官方文档](https://capacitorjs.com/docs/android)
+### 文档位置
 
-### 社区支持:
-- [Stack Overflow](https://stackoverflow.com/questions/tagged/android-gradle)
-- [GitHub Issues](https://github.com/ionic-team/capacitor/issues)
+| 文档 | 用途 |
+|------|------|
+| `LOCAL_BUILD_GUIDE.md` | 详细配置教程 |
+| `BITRISE_SETUP_GUIDE.md` | CI/CD配置指南 |
+| `build-apk.ps1` | 一键构建脚本 |
+| `BITRISE.yml` | CI/CD 工作流定义 |
+
+### 在线资源
+
+- [Gradle 官方文档](https://docs.gradle.org/)
+- [Capacitor 官方文档](https://capacitorjs.com/)
+- [Bitrise 支持中心](https://support.bitrise.io/)
 
 ---
 
-## ✨ 总结
+## ✅ 快速检查清单
 
-通过本地构建方式，您现在拥有：
-- ✅ **完全离线能力** - 不依赖任何云服务
-- ✅ **快速迭代** - 1-2 分钟即可看到变化
-- ✅ **灵活控制** - 可定制每个构建细节
-- ✅ **数据安全** - APK 完全在本地管理
+部署前确认以下项目已完成：
 
-下一步可以探索：
-- 集成单元测试
-- 性能基准测试
-- 自动化测试流程
+- [ ] Node.js v16+ 已安装
+- [ ] JDK 17 已安装并设置 JAVA_HOME
+- [ ] Android SDK 已安装并通过 Android Studio 配置
+- [ ] `git clone` 或下载项目代码到本地
+- [ ] 运行 `.\build-apk.ps1` 成功完成首次构建
+- [ ] APK 文件出现在 `C:\Users\Administrator\Desktop\计划\android\` 目录
+- [ ] 在真机上测试 APK 可正常安装和运行
 
-需要更多帮助？查看上面的常见问题部分！
+---
+
+**祝您构建顺利！** 🎉
+
+如有任何问题，请查看本文档中的"常见问题排查"部分或联系技术支持。
