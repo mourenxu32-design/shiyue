@@ -1,0 +1,61 @@
+# Bitrise CI/CD Configuration for ShiYue Android APK
+# https://www.bitrise.io/
+
+workflows:
+  # Build workflow - triggered on code push
+  build-android:
+    steps:
+      - activate-ssh-key@1:
+          settings:
+            key-files: "id_rsa"
+            known-hosts: "${DEPLOY_HOST}"
+          title: <empty>
+          is_always_run: false
+          
+      - git-clone@2: {}
+      
+      # Install Node.js dependencies
+      - npm-install@3: {}
+      
+      # Set up JDK 17
+      - java-toolchain-setup@3: {}
+      
+      # Get Android SDK license
+      - android-sdk-license-validator@4: {}
+      
+      # Run Gradle debug build
+      - gradle-runner@6:
+          inputs:
+            - command: assembleDebug
+              path: ./android/app/build.gradle
+      
+      # Test and verify
+      - gradle-runner@6:
+          inputs:
+            - command: testDebugUnitTest
+              path: ./android/app/build.gradle
+      
+      # Upload APK to artifact storage
+      - upload-artifact@1:
+          settings:
+            artifact-path: "./android/app/build/outputs/apk/debug/*.apk"
+            public: true
+    
+    # Workflow environment variables
+    environment:
+      - ANDROID_API_LEVEL: "34"
+      - JAVA_DISTRIBUTION: "temurin"
+      - JAVA_VERSION: "17"
+      - GRADLE_USER_HOME: "~/.gradle"
+
+trigger-rules:
+  - branch-pattern: main
+    pattern-type: starts-with
+  - tag-pattern: "v*"
+    pattern-type: glob
+    event-type: tag_pushed
+  
+---
+meta:
+  api_version: 1.9
+  stack: "linux-rhel-8-generic"

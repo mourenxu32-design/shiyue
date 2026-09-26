@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  apk-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.android
+    container_name: shiyue-apk-builder
+    volumes:
+      # Mount Android SDK for caching
+      - android-sdk:/opt/android-sdk
+      # Mount Gradle cache
+      - gradle-cache:/root/.gradle
+      # Expose APK output to host
+      - ./android/app/build/outputs/apk:/app/android/app/build/outputs/apk:rw
+    command: >
+      bash -c "
+        export ANDROID_HOME=/opt/android-sdk &&
+        export ANDROID_SDK_ROOT=/opt/android-sdk &&
+        yes | sdkmanager --licenses 2>/dev/null || true &&
+        chmod +x android/gradlew &&
+        cd android &&
+        ./gradlew clean assembleDebug
+      "
+
+volumes:
+  android-sdk:
+  gradle-cache:
